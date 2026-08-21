@@ -13,7 +13,7 @@ import { AdminSettings } from "./pages/admin/AdminSettings";
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, "") || "/"}>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/agendar" element={<Booking />} />

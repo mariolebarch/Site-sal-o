@@ -41,7 +41,7 @@ export function Navbar() {
           {navLinks.map((l) => (
             <a
               key={l.href}
-              href={onHome ? l.href : "/" + l.href}
+              href={onHome ? l.href : import.meta.env.BASE_URL + l.href}
               onClick={(e) => {
                 if (!onHome) return;
                 e.preventDefault();
@@ -89,7 +89,7 @@ export function Navbar() {
           {navLinks.map((l) => (
             <a
               key={l.href}
-              href={onHome ? l.href : "/" + l.href}
+              href={onHome ? l.href : import.meta.env.BASE_URL + l.href}
               onClick={(e) => {
                 setOpen(false);
                 if (!onHome) return;

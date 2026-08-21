@@ -12,6 +12,7 @@ interface PhotoPlaceholderProps {
 
 export function PhotoPlaceholder({ src, alt, label, className, imgClassName }: PhotoPlaceholderProps) {
   const [errored, setErrored] = useState(false);
+  const resolvedSrc = import.meta.env.BASE_URL + src.replace(/^\//, "");
 
   if (errored) {
     return (
@@ -33,7 +34,7 @@ export function PhotoPlaceholder({ src, alt, label, className, imgClassName }: P
 
   return (
     <img
-      src={src}
+      src={resolvedSrc}
       alt={alt}
       loading="lazy"
       onError={() => setErrored(true)}
