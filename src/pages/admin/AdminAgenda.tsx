@@ -93,7 +93,11 @@ export function AdminAgenda() {
     setManualSubmitting(false);
 
     if (!result.ok) {
-      setManualError("Não foi possível criar o agendamento. Tente novamente.");
+      setManualError(
+        `Não foi possível criar o agendamento. Tente novamente.${
+          result.error ? ` (detalhe técnico: ${result.error})` : ""
+        }`
+      );
       return;
     }
     setShowManualForm(false);

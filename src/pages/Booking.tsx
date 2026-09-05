@@ -115,7 +115,11 @@ export function Booking() {
     if (result.ok) {
       setDone(true);
     } else {
-      setSubmitError("Não foi possível confirmar o agendamento. Tente novamente em instantes.");
+      setSubmitError(
+        `Não foi possível confirmar o agendamento. Tente novamente em instantes.${
+          result.error ? ` (detalhe técnico: ${result.error})` : ""
+        }`
+      );
     }
   }
 
