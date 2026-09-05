@@ -1,0 +1,123 @@
+import { useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useAppStore } from "../../store/useAppStore";
+import { getWeekday, isPastDate, toDateInputValue } from "../../utils/slots";
+import { weekdayShort } from "../../data/business";
+
+interface CalendarPickerProps {
+  selectedDate: string | null;
+  onSelect: (date: string) => void;
+}
+
+const MONTH_NAMES = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
+
+export function CalendarPicker({ selectedDate, onSelect }: CalendarPickerProps) {
+  const businessHours = useAppStore((s) => s.businessHours);
+  const blockedDates = useAppStore((s) => s.blockedDates);
+
+  const today = useMemo(() => new Date(), []);
+  const [viewYear, setViewYear] = useState(today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+
+  const blockedSet = useMemo(() => new Set(blockedDates.map((b) => b.date)), [blockedDates]);
+
+  const firstDayOfMonth = new Date(viewYear, viewMonth, 1);
+  const mondayFirstOffset = (firstDayOfMonth.getDay() + 6) % 7;
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+
+  const cells: (string | null)[] = [
+    ...Array.from({ length: mondayFirstOffset }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, i) => toDateInputValue(new Date(viewYear, viewMonth, i + 1))),
+  ];
+
+  const minMonth = today.getFullYear() * 12 + today.getMonth();
+  const viewingMonth = viewYear * 12 + viewMonth;
+
+  function goPrev() {
+    if (viewingMonth <= minMonth) return;
+    const d = new Date(viewYear, viewMonth - 1, 1);
+    setViewYear(d.getFullYear());
+    setViewMonth(d.getMonth());
+  }
+
+  function goNext() {
+    const d = new Date(viewYear, viewMonth + 1, 1);
+    setViewYear(d.getFullYear());
+    setViewMonth(d.getMonth());
+  }
+
+  return (
+    <div className="rounded-2xl border border-blush-200 bg-white p-5 shadow-soft">
+      <div className="flex items-center justify-between mb-4">
+        <button
+          type="button"
+          onClick={goPrev}
+          disabled={viewingMonth <= minMonth}
+          className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-blush-100 disabled:opacity-30 disabled:hover:bg-transparent text-rose-700"
+          aria-label="Mês anterior"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <p className="font-display text-lg text-rose-800">
+          {MONTH_NAMES[viewMonth]} {viewYear}
+        </p>
+        <button
+          type="button"
+          onClick={goNext}
+          className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-blush-100 text-rose-700"
+          aria-label="Próximo mês"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-ink-500 mb-2">
+        {[1, 2, 3, 4, 5, 6, 0].map((d) => (
+          <span key={d}>{weekdayShort[d as 0 | 1 | 2 | 3 | 4 | 5 | 6]}</span>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map((date, i) => {
+          if (!date) return <div key={`empty-${i}`} />;
+          const weekday = getWeekday(date);
+          const dayHours = businessHours[weekday];
+          const past = isPastDate(date);
+          const fullyBlocked = blockedSet.has(date);
+          const disabled = past || !dayHours.open || fullyBlocked;
+          const isSelected = selectedDate === date;
+          const dayNum = Number(date.split("-")[2]);
+
+          return (
+            <button
+              key={date}
+              type="button"
+              disabled={disabled}
+              onClick={() => onSelect(date)}
+              title={fullyBlocked ? "Dia bloqueado" : !dayHours.open ? "Fechado" : undefined}
+              className={`aspect-square rounded-lg text-sm font-medium transition-colors flex items-center justify-center
+                ${isSelected ? "bg-rose-600 text-white shadow-soft" : ""}
+                ${!isSelected && !disabled ? "hover:bg-blush-100 text-ink-900" : ""}
+                ${disabled ? "text-ink-500/30 cursor-not-allowed line-through decoration-1" : ""}
+              `}
+            >
+              {dayNum}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-500">
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-rose-600" /> Selecionado
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-ink-500/20" /> Indisponível
+        </span>
+      </div>
+    </div>
+  );
+}
