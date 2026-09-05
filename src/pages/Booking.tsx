@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Check, MessageCircle, CalendarCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, MessageCircle, CalendarCheck, RefreshCw } from "lucide-react";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/Footer";
 import { StepIndicator } from "../components/booking/StepIndicator";
@@ -26,6 +26,9 @@ export function Booking() {
   const [params] = useSearchParams();
   const services = useAppStore((s) => s.services);
   const addAppointment = useAppStore((s) => s.addAppointment);
+  const loadingData = useAppStore((s) => s.loading);
+  const loadError = useAppStore((s) => s.loadError);
+  const reloadData = useAppStore((s) => s.reloadData);
 
   const [step, setStep] = useState(0);
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
@@ -198,7 +201,25 @@ export function Booking() {
                   <p className="mb-4 text-center text-xs text-red-600 max-w-md mx-auto">{submitError}</p>
                 )}
 
-                {step === 0 && (
+                {step === 0 && services.length === 0 && (
+                  <div className="text-center py-10 animate-fade-up">
+                    <p className="text-sm text-ink-500 mb-4">
+                      {loadingData
+                        ? "Carregando procedimentos..."
+                        : loadError ?? "Não conseguimos carregar os procedimentos agora."}
+                    </p>
+                    {!loadingData && (
+                      <button
+                        onClick={() => reloadData()}
+                        className="inline-flex items-center gap-2 rounded-full border border-blush-300 hover:border-rose-400 text-rose-700 font-semibold px-5 py-2.5 text-sm transition-colors"
+                      >
+                        <RefreshCw className="h-4 w-4" /> Tentar novamente
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {step === 0 && services.length > 0 && (
                   <div className="space-y-6 animate-fade-up">
                     {selectedServices.length > 0 && (
                       <div className="max-w-md mx-auto rounded-2xl bg-blush-50 border border-blush-200 px-4 py-3 text-sm flex items-center justify-between gap-3">

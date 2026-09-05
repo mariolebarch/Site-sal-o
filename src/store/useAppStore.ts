@@ -45,9 +45,11 @@ interface AppState {
 
   loading: boolean;
   ready: boolean;
+  loadError: string | null;
   isAdminAuthenticated: boolean;
 
   init: () => Promise<void>;
+  reloadData: () => Promise<void>;
 
   login: (email: string, password: string) => Promise<ActionResult>;
   logout: () => Promise<void>;
@@ -125,6 +127,32 @@ function mapBlockedRangeRow(row: any): BlockedRange {
   };
 }
 
+async function fetchCoreOnce() {
+  return Promise.all([
+    supabase.from("services").select("*").order("category_id"),
+    supabase.from("app_settings").select("*").eq("id", "main").maybeSingle(),
+    supabase.from("blocked_dates").select("*"),
+    supabase.from("blocked_ranges").select("*"),
+  ]);
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Redes móveis podem falhar na primeira tentativa; tenta mais algumas vezes
+// antes de desistir, para não deixar a tela de agendamento vazia à toa.
+async function fetchCoreWithRetry(retries = 2) {
+  let result = await fetchCoreOnce();
+  let attempt = 0;
+  while (result.some((r) => r.error) && attempt < retries) {
+    await wait(700 * (attempt + 1));
+    result = await fetchCoreOnce();
+    attempt++;
+  }
+  return result;
+}
+
 export const useAppStore = create<AppState>()((set, get) => ({
   services: [],
   businessHours: defaultBusinessHours,
@@ -133,26 +161,27 @@ export const useAppStore = create<AppState>()((set, get) => ({
   appointments: [],
   loading: false,
   ready: false,
+  loadError: null,
   isAdminAuthenticated: false,
 
   init: async () => {
     if (get().ready) return;
     set({ loading: true });
 
-    const [servicesRes, settingsRes, blockedDatesRes, blockedRangesRes, sessionRes] =
-      await Promise.all([
-        supabase.from("services").select("*").order("category_id"),
-        supabase.from("app_settings").select("*").eq("id", "main").maybeSingle(),
-        supabase.from("blocked_dates").select("*"),
-        supabase.from("blocked_ranges").select("*"),
-        supabase.auth.getSession(),
-      ]);
+    const [coreResult, sessionRes] = await Promise.all([
+      fetchCoreWithRetry(),
+      supabase.auth.getSession(),
+    ]);
+    const [servicesRes, settingsRes, blockedDatesRes, blockedRangesRes] = coreResult;
 
     set({
       services: (servicesRes.data ?? []).map(mapServiceRow),
       businessHours: settingsRes.data?.business_hours ?? defaultBusinessHours,
       blockedDates: (blockedDatesRes.data ?? []).map(mapBlockedDateRow),
       blockedRanges: (blockedRangesRes.data ?? []).map(mapBlockedRangeRow),
+      loadError: servicesRes.error
+        ? "Não foi possível carregar os procedimentos. Verifique sua internet."
+        : null,
       isAdminAuthenticated: !!sessionRes.data.session,
       loading: false,
       ready: true,
@@ -169,6 +198,21 @@ export const useAppStore = create<AppState>()((set, get) => ({
       } else {
         set({ appointments: [] });
       }
+    });
+  },
+
+  reloadData: async () => {
+    set({ loading: true });
+    const [servicesRes, settingsRes, blockedDatesRes, blockedRangesRes] = await fetchCoreWithRetry();
+    set({
+      services: (servicesRes.data ?? []).map(mapServiceRow),
+      businessHours: settingsRes.data?.business_hours ?? defaultBusinessHours,
+      blockedDates: (blockedDatesRes.data ?? []).map(mapBlockedDateRow),
+      blockedRanges: (blockedRangesRes.data ?? []).map(mapBlockedRangeRow),
+      loadError: servicesRes.error
+        ? "Não foi possível carregar os procedimentos. Verifique sua internet."
+        : null,
+      loading: false,
     });
   },
 

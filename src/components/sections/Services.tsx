@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Clock, ArrowRight } from "lucide-react";
+import { Clock, ArrowRight, RefreshCw } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { serviceCategories } from "../../data/services";
 import { IconHand, IconFoot, IconSparkleGlyph, IconCombo, IconExtra } from "../decor/Icons";
@@ -14,6 +14,9 @@ const categoryIcons = {
 
 export function Services() {
   const services = useAppStore((s) => s.services);
+  const loadingData = useAppStore((s) => s.loading);
+  const loadError = useAppStore((s) => s.loadError);
+  const reloadData = useAppStore((s) => s.reloadData);
 
   return (
     <section id="servicos" className="relative py-20 md:py-28 bg-blush-50">
@@ -28,6 +31,24 @@ export function Services() {
             agendamento mostra automaticamente os horários disponíveis conforme o tempo necessário.
           </p>
         </div>
+
+        {services.length === 0 && (
+          <div className="mt-14 text-center">
+            <p className="text-sm text-ink-500 mb-4">
+              {loadingData
+                ? "Carregando procedimentos..."
+                : loadError ?? "Não conseguimos carregar os procedimentos agora."}
+            </p>
+            {!loadingData && (
+              <button
+                onClick={() => reloadData()}
+                className="inline-flex items-center gap-2 rounded-full border border-blush-300 hover:border-rose-400 text-rose-700 font-semibold px-5 py-2.5 text-sm transition-colors"
+              >
+                <RefreshCw className="h-4 w-4" /> Tentar novamente
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="mt-14 space-y-14">
           {serviceCategories.map((cat) => {
