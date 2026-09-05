@@ -127,20 +127,16 @@ export function IconInstagram(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-export function Monogram(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 40 40" {...props}>
-      <circle cx="20" cy="20" r="19" stroke="currentColor" strokeWidth="1.2" opacity="0.5" />
-      <text
-        x="20"
-        y="26"
-        textAnchor="middle"
-        fontFamily="Playfair Display, serif"
-        fontSize="16"
-        fill="currentColor"
-      >
-        RL
-      </text>
-    </svg>
-  );
+interface MonogramProps {
+  className?: string;
+  /** "dark" para fundos claros (tinta vinho), "light" para fundos escuros (tinta dourada). */
+  variant?: "dark" | "light";
+}
+
+export function Monogram({ className, variant = "dark" }: MonogramProps) {
+  const src =
+    variant === "light"
+      ? `${import.meta.env.BASE_URL}images/logo-mark-light.png`
+      : `${import.meta.env.BASE_URL}images/logo-mark.png`;
+  return <img src={src} alt="Rose Lebarch Nails" className={`object-contain ${className ?? ""}`} />;
 }

@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Lock, Mail, Eye, EyeOff, ArrowLeft } from "lucide-react";
-import { Monogram } from "../components/decor/Icons";
 import { useAppStore } from "../store/useAppStore";
 
 export function Login() {
@@ -37,7 +36,11 @@ export function Login() {
 
       <div className="w-full max-w-sm bg-white rounded-3xl shadow-soft border border-blush-200 p-8">
         <div className="flex flex-col items-center text-center">
-          <Monogram className="h-12 w-12 text-rose-600" />
+          <img
+            src={`${import.meta.env.BASE_URL}images/logo-full.png`}
+            alt="Rose Lebarch Nails"
+            className="h-20 w-auto object-contain"
+          />
           <h1 className="mt-4 font-display text-2xl text-rose-900">Área da profissional</h1>
           <p className="mt-1 text-sm text-ink-500">Entre para gerenciar sua agenda e horários.</p>
         </div>

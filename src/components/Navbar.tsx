@@ -31,7 +31,7 @@ export function Navbar() {
     >
       <div className="mx-auto max-w-7xl px-5 sm:px-8 flex items-center justify-between h-16 md:h-20">
         <Link to="/" className="flex items-center gap-2 group">
-          <Monogram className="h-9 w-9 text-rose-600 transition-transform group-hover:scale-105" />
+          <Monogram className="h-9 w-9 transition-transform group-hover:scale-105" />
           <span className="font-display text-lg md:text-xl text-rose-800 tracking-wide">
             Studio Rosely Lebarch
           </span>

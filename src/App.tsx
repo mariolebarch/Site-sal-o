@@ -24,7 +24,7 @@ function App() {
   if (!ready) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-cream-100">
-        <Monogram className="h-12 w-12 text-rose-400 animate-pulse" />
+        <Monogram className="h-12 w-12 animate-pulse" />
       </div>
     );
   }

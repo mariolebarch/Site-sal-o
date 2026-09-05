@@ -75,7 +75,7 @@ function SidebarContent({ onNavigate, onLogout }: { onNavigate: () => void; onLo
   return (
     <>
       <Link to="/" className="flex items-center gap-2 px-6 py-6">
-        <Monogram className="h-9 w-9 text-gold-400" />
+        <Monogram variant="light" className="h-9 w-9" />
         <div>
           <p className="font-display text-base text-cream-50 leading-tight">Studio Rosely</p>
           <p className="text-[11px] text-blush-200/70">Painel administrativo</p>

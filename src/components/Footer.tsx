@@ -12,7 +12,7 @@ export function Footer() {
       <div className="mx-auto max-w-7xl px-6 sm:px-8 py-14 grid gap-10 md:grid-cols-3">
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <Monogram className="h-9 w-9 text-gold-400" />
+            <Monogram variant="light" className="h-9 w-9" />
             <span className="font-display text-xl text-cream-50">Studio Rosely Lebarch</span>
           </div>
           <p className="text-sm text-blush-200/80 leading-relaxed max-w-xs">{business.bio}</p>
