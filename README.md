@@ -1,9 +1,32 @@
 # Studio Rosely Lebarch — Nails Design
 
 Site institucional + sistema de agendamento para o Studio Rosely Lebarch
-(@studioroselebarch). Construído com React, TypeScript, Vite, Tailwind CSS e
-React Router. Os dados (agenda, bloqueios, serviços e senha do painel) ficam
-salvos no `localStorage` do navegador — não há backend/servidor.
+(@studioroselebarch). Construído com React, TypeScript, Vite, Tailwind CSS,
+React Router e **Supabase** (banco de dados Postgres + autenticação),
+compartilhado entre todos os dispositivos.
+
+## Configurando o Supabase (obrigatório)
+
+O projeto Supabase já usado se chama **"Salão - Rosely"**. Para conectar:
+
+1. **Rode o esquema do banco.** No [Supabase Studio](https://supabase.com/dashboard),
+   abra o projeto → **SQL Editor** → **New query**, cole todo o conteúdo de
+   `supabase/schema.sql` e clique em **Run**. Isso cria as tabelas
+   (`services`, `app_settings`, `blocked_dates`, `blocked_ranges`,
+   `appointments`), as regras de segurança (RLS) e os serviços padrão.
+2. **Crie a conta da profissional.** Em **Authentication → Users → Add user**,
+   crie um usuário com e-mail e senha (marque "Auto Confirm User"). É esse
+   e-mail/senha que a Rosely vai usar para entrar em `/login`.
+3. **Configure as variáveis de ambiente.** Em **Project Settings → API**,
+   copie a **Project URL** e a chave **anon public**, e crie um arquivo
+   `.env` na raiz do projeto (baseado em `.env.example`):
+
+   ```
+   VITE_SUPABASE_URL=https://SEU-PROJETO.supabase.co
+   VITE_SUPABASE_ANON_KEY=sua-chave-anon-public
+   ```
+
+   O arquivo `.env` não é versionado (está no `.gitignore`).
 
 ## Rodando localmente
 
@@ -29,13 +52,11 @@ npm run preview
   data → horário (calculado automaticamente pela duração do serviço,
   horário de funcionamento e bloqueios) → dados do cliente → confirmação
   (com link para confirmar via WhatsApp).
-- `/login` — acesso à área administrativa.
+- `/login` — acesso à área administrativa (e-mail e senha cadastrados no
+  Supabase Auth).
 - `/admin` — painel da profissional: dashboard, agenda, bloqueio de
   datas/horários, gestão de serviços, horário de funcionamento e troca de
   senha.
-
-**Senha padrão do painel admin:** `rosely2026` (altere em
-Configurações após o primeiro acesso).
 
 ## Adicionando as fotos reais do Instagram
 
@@ -47,13 +68,26 @@ código.
 
 ## Sobre a persistência de dados
 
-Este projeto não tem backend: agendamentos, bloqueios e configurações
-ficam salvos no `localStorage` do navegador de quem acessa. Isso significa
-que:
+Os dados (serviços, horário de funcionamento, bloqueios e agendamentos)
+ficam em um banco Supabase (Postgres) compartilhado — clientes e a
+profissional veem a mesma agenda, em qualquer dispositivo ou navegador.
 
-- Os agendamentos feitos por clientes em um dispositivo só aparecem no
-  painel admin se for o **mesmo navegador**.
-- Para uso real em produção (clientes e admin em dispositivos diferentes
-  vendo a mesma agenda), é necessário um backend com banco de dados
-  compartilhado (ex.: Supabase, Firebase, ou uma API própria) substituindo
-  o `src/store/useAppStore.ts`.
+Regras de acesso (Row Level Security):
+
+- Qualquer visitante pode **ler** serviços, horário de funcionamento e
+  bloqueios, e **criar** um novo agendamento (necessário para o fluxo de
+  `/agendar`).
+- Apenas a profissional autenticada (login em `/login`) pode **ver a lista
+  completa de agendamentos** (nome/telefone das clientes) e **editar**
+  serviços, horários e bloqueios.
+- Para calcular os horários livres em `/agendar` sem expor nome/telefone
+  de outras clientes, o site usa a função `get_booked_slots`, que devolve
+  apenas os horários já ocupados (sem dados pessoais).
+
+## Deploy (GitHub Pages)
+
+O build de produção precisa das variáveis `VITE_SUPABASE_URL` e
+`VITE_SUPABASE_ANON_KEY` definidas no momento do `npm run build` (elas são
+"assadas" no bundle, pois o site é 100% estático). Se publicar via GitHub
+Actions/Pages, configure essas duas variáveis como *secrets*/*variables* do
+repositório e exporte-as antes do build.

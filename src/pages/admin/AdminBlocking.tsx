@@ -21,22 +21,37 @@ export function AdminBlocking() {
   const [rangeEnd, setRangeEnd] = useState("13:00");
   const [rangeReason, setRangeReason] = useState("");
   const [rangeError, setRangeError] = useState("");
+  const [dateError, setDateError] = useState("");
 
-  function handleBlockDate(e: FormEvent) {
+  async function handleBlockDate(e: FormEvent) {
     e.preventDefault();
+    setDateError("");
     if (blockedDates.some((b) => b.date === dateToBlock)) return;
-    addBlockedDate(dateToBlock, dateReason.trim() || undefined);
+    const result = await addBlockedDate(dateToBlock, dateReason.trim() || undefined);
+    if (!result.ok) {
+      setDateError("Não foi possível bloquear a data. Tente novamente.");
+      return;
+    }
     setDateReason("");
   }
 
-  function handleBlockRange(e: FormEvent) {
+  async function handleBlockRange(e: FormEvent) {
     e.preventDefault();
     setRangeError("");
     if (rangeStart >= rangeEnd) {
       setRangeError("O horário final deve ser depois do inicial.");
       return;
     }
-    addBlockedRange({ date: rangeDate, startTime: rangeStart, endTime: rangeEnd, reason: rangeReason.trim() || undefined });
+    const result = await addBlockedRange({
+      date: rangeDate,
+      startTime: rangeStart,
+      endTime: rangeEnd,
+      reason: rangeReason.trim() || undefined,
+    });
+    if (!result.ok) {
+      setRangeError("Não foi possível bloquear o horário. Tente novamente.");
+      return;
+    }
     setRangeReason("");
   }
 
@@ -82,6 +97,7 @@ export function AdminBlocking() {
                 className="w-full rounded-lg border border-blush-300 px-3 py-2 text-sm"
               />
             </div>
+            {dateError && <p className="text-xs text-red-600">{dateError}</p>}
             <button
               type="submit"
               className="inline-flex items-center gap-2 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold px-5 py-2.5 transition-colors"

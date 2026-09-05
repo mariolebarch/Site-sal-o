@@ -1,5 +1,10 @@
 import type { Weekday, DayHours } from "../data/business";
-import type { Appointment, BlockedDate, BlockedRange } from "../store/useAppStore";
+import type { BlockedDate, BlockedRange } from "../store/useAppStore";
+
+export interface BookedRange {
+  startTime: string;
+  endTime: string;
+}
 
 export const SLOT_STEP_MIN = 15;
 
@@ -48,7 +53,7 @@ interface GenerateSlotsParams {
   dayHours: DayHours;
   blockedDates: BlockedDate[];
   blockedRanges: BlockedRange[];
-  appointments: Appointment[];
+  bookedRanges: BookedRange[];
   nowMinutes?: number;
   isToday?: boolean;
 }
@@ -59,7 +64,7 @@ export function generateTimeSlots({
   dayHours,
   blockedDates,
   blockedRanges,
-  appointments,
+  bookedRanges,
   nowMinutes,
   isToday,
 }: GenerateSlotsParams): TimeSlot[] {
@@ -72,9 +77,7 @@ export function generateTimeSlots({
   const dayEnd = timeToMinutes(dayHours.end);
 
   const rangesForDay = blockedRanges.filter((r) => r.date === date);
-  const bookedForDay = appointments.filter(
-    (a) => a.date === date && a.status === "confirmado"
-  );
+  const bookedForDay = bookedRanges;
 
   const slots: TimeSlot[] = [];
 

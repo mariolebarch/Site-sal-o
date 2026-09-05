@@ -1,12 +1,13 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { Lock, Mail, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { Monogram } from "../components/decor/Icons";
 import { useAppStore } from "../store/useAppStore";
 
 export function Login() {
   const navigate = useNavigate();
   const login = useAppStore((s) => s.login);
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -16,12 +17,12 @@ export function Login() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const ok = await login(password);
+    const result = await login(email.trim(), password);
     setLoading(false);
-    if (ok) {
+    if (result.ok) {
       navigate("/admin");
     } else {
-      setError("Senha incorreta. Tente novamente.");
+      setError("E-mail ou senha incorretos. Tente novamente.");
     }
   }
 
@@ -43,6 +44,22 @@ export function Login() {
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-4">
           <div>
+            <label className="block text-sm font-medium text-ink-700 mb-1.5">E-mail</label>
+            <div className="relative">
+              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-500/60" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="seu@email.com"
+                className="w-full rounded-xl border border-blush-300 pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
+                autoFocus
+                required
+              />
+            </div>
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-ink-700 mb-1.5">Senha de acesso</label>
             <div className="relative">
               <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-500/60" />
@@ -52,7 +69,7 @@ export function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 className="w-full rounded-xl border border-blush-300 pl-10 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
-                autoFocus
+                required
               />
               <button
                 type="button"
@@ -69,18 +86,12 @@ export function Login() {
 
           <button
             type="submit"
-            disabled={loading || !password}
+            disabled={loading || !password || !email}
             className="w-full rounded-full bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-semibold py-2.5 text-sm transition-colors"
           >
             {loading ? "Entrando..." : "Entrar"}
           </button>
         </form>
-
-        <p className="mt-6 text-center text-[11px] text-ink-500/70 leading-relaxed">
-          Senha padrão inicial: <code className="font-mono bg-blush-100 px-1.5 py-0.5 rounded">rosely2026</code>
-          <br />
-          Altere em Configurações após o primeiro acesso.
-        </p>
       </div>
     </div>
   );

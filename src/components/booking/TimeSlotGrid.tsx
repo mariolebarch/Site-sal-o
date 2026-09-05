@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
-import { generateTimeSlots, getWeekday, toDateInputValue } from "../../utils/slots";
+import { supabase } from "../../lib/supabaseClient";
+import { generateTimeSlots, getWeekday, toDateInputValue, type BookedRange } from "../../utils/slots";
 
 interface TimeSlotGridProps {
   date: string;
@@ -13,7 +14,33 @@ export function TimeSlotGrid({ date, durationMin, selectedTime, onSelect }: Time
   const businessHours = useAppStore((s) => s.businessHours);
   const blockedDates = useAppStore((s) => s.blockedDates);
   const blockedRanges = useAppStore((s) => s.blockedRanges);
-  const appointments = useAppStore((s) => s.appointments);
+
+  const [bookedRanges, setBookedRanges] = useState<BookedRange[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    supabase
+      .rpc("get_booked_slots", { p_date: date })
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) {
+          setBookedRanges([]);
+        } else {
+          setBookedRanges(
+            (data ?? []).map((r: { start_time: string; end_time: string }) => ({
+              startTime: r.start_time,
+              endTime: r.end_time,
+            }))
+          );
+        }
+        setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [date]);
 
   const slots = useMemo(() => {
     const now = new Date();
@@ -24,13 +51,21 @@ export function TimeSlotGrid({ date, durationMin, selectedTime, onSelect }: Time
       dayHours: businessHours[getWeekday(date)],
       blockedDates,
       blockedRanges,
-      appointments,
+      bookedRanges,
       isToday,
       nowMinutes: now.getHours() * 60 + now.getMinutes(),
     });
-  }, [date, durationMin, businessHours, blockedDates, blockedRanges, appointments]);
+  }, [date, durationMin, businessHours, blockedDates, blockedRanges, bookedRanges]);
 
   const available = slots.filter((s) => s.available);
+
+  if (loading) {
+    return (
+      <p className="text-sm text-ink-500 bg-blush-100/60 rounded-xl p-4 text-center">
+        Carregando horários disponíveis...
+      </p>
+    );
+  }
 
   if (slots.length === 0) {
     return (

@@ -19,16 +19,20 @@ export function AdminServices() {
 
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setError("");
     if (!form.name.trim()) return;
-    if (editingId) {
-      updateService(editingId, form);
-      setEditingId(null);
-    } else {
-      addService({ ...form, active: true });
+    const result = editingId
+      ? await updateService(editingId, form)
+      : await addService({ ...form, active: true });
+    if (!result.ok) {
+      setError("Não foi possível salvar o procedimento. Tente novamente.");
+      return;
     }
+    setEditingId(null);
     setForm(emptyForm);
   }
 
@@ -108,6 +112,7 @@ export function AdminServices() {
             />
           </div>
         </div>
+        {error && <p className="text-xs text-red-600">{error}</p>}
         <div className="flex items-center gap-3">
           <button
             type="submit"

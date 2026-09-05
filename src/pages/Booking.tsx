@@ -36,6 +36,8 @@ export function Booking() {
   const [clientPhone, setClientPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [done, setDone] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const selectedService = useMemo(() => services.find((s) => s.id === serviceId) ?? null, [services, serviceId]);
 
@@ -73,14 +75,16 @@ export function Booking() {
     return true;
   }
 
-  function handleConfirm() {
+  async function handleConfirm() {
     if (!selectedService || !date || !time) return;
     const endMinutes = time.split(":").map(Number);
     const totalStart = endMinutes[0] * 60 + endMinutes[1];
     const totalEnd = totalStart + selectedService.durationMin;
     const endTime = `${Math.floor(totalEnd / 60).toString().padStart(2, "0")}:${(totalEnd % 60).toString().padStart(2, "0")}`;
 
-    addAppointment({
+    setSubmitError("");
+    setSubmitting(true);
+    const result = await addAppointment({
       serviceId: selectedService.id,
       date,
       startTime: time,
@@ -89,7 +93,12 @@ export function Booking() {
       clientPhone: clientPhone.trim(),
       notes: notes.trim() || undefined,
     });
-    setDone(true);
+    setSubmitting(false);
+    if (result.ok) {
+      setDone(true);
+    } else {
+      setSubmitError("Não foi possível confirmar o agendamento. Tente novamente em instantes.");
+    }
   }
 
   const whatsappMessage = selectedService && date && time
@@ -272,6 +281,10 @@ export function Booking() {
                   </div>
                 )}
 
+                {submitError && (
+                  <p className="mt-4 text-center text-xs text-red-600 max-w-md mx-auto">{submitError}</p>
+                )}
+
                 <div className="mt-9 flex items-center justify-between max-w-md mx-auto">
                   <button
                     onClick={() => setStep((s) => Math.max(0, s - 1))}
@@ -292,9 +305,10 @@ export function Booking() {
                   ) : (
                     <button
                       onClick={handleConfirm}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-semibold px-6 py-2.5 text-sm transition-colors"
+                      disabled={submitting}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-rose-600 hover:bg-rose-700 disabled:opacity-60 text-white font-semibold px-6 py-2.5 text-sm transition-colors"
                     >
-                      <Check className="h-4 w-4" /> Confirmar agendamento
+                      <Check className="h-4 w-4" /> {submitting ? "Confirmando..." : "Confirmar agendamento"}
                     </button>
                   )}
                 </div>

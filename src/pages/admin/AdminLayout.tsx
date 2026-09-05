@@ -28,8 +28,8 @@ export function AdminLayout() {
   const logout = useAppStore((s) => s.logout);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  function handleLogout() {
-    logout();
+  async function handleLogout() {
+    await logout();
     navigate("/login");
   }
 
