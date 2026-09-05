@@ -39,7 +39,7 @@ create table if not exists blocked_ranges (
 
 create table if not exists appointments (
   id uuid primary key default gen_random_uuid(),
-  service_id text not null references services(id),
+  service_ids text[] not null,
   date date not null,
   start_time text not null,
   end_time text not null,

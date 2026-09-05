@@ -28,6 +28,10 @@ O projeto Supabase já usado se chama **"Salão - Rosely"**. Para conectar:
 
    O arquivo `.env` não é versionado (está no `.gitignore`).
 
+**Já tinha rodado o `schema.sql` antes?** Depois desta atualização (agendamentos
+com múltiplos procedimentos), rode também `supabase/migration_002_multiplos_procedimentos.sql`
+no SQL Editor — ele adapta a tabela `appointments` sem apagar dados existentes.
+
 ## Rodando localmente
 
 ```bash
@@ -48,15 +52,17 @@ npm run preview
 
 - `/` — site institucional (hero, sobre, serviços, galeria, depoimentos,
   localização).
-- `/agendar` — fluxo de agendamento dinâmico: categoria → procedimento →
-  data → horário (calculado automaticamente pela duração do serviço,
-  horário de funcionamento e bloqueios) → dados do cliente → confirmação
-  (com link para confirmar via WhatsApp).
+- `/agendar` — fluxo de agendamento dinâmico: procedimentos (é possível
+  escolher mais de um, ex.: mãos + pés, no mesmo horário) → data → horário
+  (calculado automaticamente pela duração total, horário de funcionamento e
+  bloqueios) → dados do cliente → confirmação (com link para confirmar via
+  WhatsApp).
 - `/login` — acesso à área administrativa (e-mail e senha cadastrados no
   Supabase Auth).
-- `/admin` — painel da profissional: dashboard, agenda, bloqueio de
-  datas/horários, gestão de serviços, horário de funcionamento e troca de
-  senha.
+- `/admin` — painel da profissional: dashboard, agenda (com opção de marcar
+  um horário manualmente e de enviar um lembrete por WhatsApp para a
+  cliente), bloqueio de datas/horários, gestão de serviços, horário de
+  funcionamento e troca de senha.
 
 ## Adicionando as fotos reais do Instagram
 

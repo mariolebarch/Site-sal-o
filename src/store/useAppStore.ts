@@ -6,7 +6,7 @@ import type { Service } from "../data/services";
 
 export interface Appointment {
   id: string;
-  serviceId: string;
+  serviceIds: string[];
   date: string; // yyyy-MM-dd
   startTime: string; // HH:mm
   endTime: string; // HH:mm
@@ -99,7 +99,7 @@ function mapServiceRow(row: any): Service {
 function mapAppointmentRow(row: any): Appointment {
   return {
     id: row.id,
-    serviceId: row.service_id,
+    serviceIds: row.service_ids ?? (row.service_id ? [row.service_id] : []),
     date: row.date,
     startTime: row.start_time,
     endTime: row.end_time,
@@ -206,7 +206,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const { data, error } = await supabase
       .from("appointments")
       .insert({
-        service_id: a.serviceId,
+        service_ids: a.serviceIds,
         date: a.date,
         start_time: a.startTime,
         end_time: a.endTime,

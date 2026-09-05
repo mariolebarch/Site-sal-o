@@ -35,11 +35,16 @@ export function AdminDashboard() {
     const in7Str = toDateInputValue(in7);
     return appointments
       .filter((a) => a.status === "confirmado" && a.date >= todayStr && a.date <= in7Str)
-      .reduce((sum, a) => sum + (services.find((s) => s.id === a.serviceId)?.price ?? 0), 0);
+      .reduce(
+        (sum, a) =>
+          sum + a.serviceIds.reduce((s2, id) => s2 + (services.find((s) => s.id === id)?.price ?? 0), 0),
+        0
+      );
   }, [appointments, services, todayStr]);
 
-  function serviceName(id: string) {
-    return services.find((s) => s.id === id)?.name ?? "Procedimento removido";
+  function serviceName(ids: string[]) {
+    const names = ids.map((id) => services.find((s) => s.id === id)?.name).filter(Boolean) as string[];
+    return names.length > 0 ? names.join(" + ") : "Procedimento removido";
   }
 
   const stats = [
@@ -84,7 +89,7 @@ export function AdminDashboard() {
                 <li key={a.id} className="flex items-center justify-between gap-3 border-b border-blush-100 pb-3 last:border-0 last:pb-0">
                   <div>
                     <p className="text-sm font-semibold text-ink-900">{a.clientName}</p>
-                    <p className="text-xs text-ink-500">{serviceName(a.serviceId)}</p>
+                    <p className="text-xs text-ink-500">{serviceName(a.serviceIds)}</p>
                   </div>
                   <span className="text-sm font-semibold text-rose-600 shrink-0">{a.startTime}</span>
                 </li>
@@ -105,7 +110,7 @@ export function AdminDashboard() {
                 <li key={a.id} className="flex items-center justify-between gap-3 border-b border-blush-100 pb-3 last:border-0 last:pb-0">
                   <div>
                     <p className="text-sm font-semibold text-ink-900">{a.clientName}</p>
-                    <p className="text-xs text-ink-500">{serviceName(a.serviceId)} · {formatDateBR(a.date)}</p>
+                    <p className="text-xs text-ink-500">{serviceName(a.serviceIds)} · {formatDateBR(a.date)}</p>
                   </div>
                   <span className="text-sm font-semibold text-rose-600 shrink-0">{a.startTime}</span>
                 </li>
