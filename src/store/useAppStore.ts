@@ -195,14 +195,15 @@ function applyCoreResult(
   for (const row of hoursRes.data ?? []) {
     businessHoursByProfessional[row.professional_id] = row.business_hours ?? defaultBusinessHours;
   }
+  const coreError = professionalsRes.error ?? servicesRes.error ?? hoursRes.error ?? null;
   set({
     professionals: (professionalsRes.data ?? []).map(mapProfessionalRow),
     services: (servicesRes.data ?? []).map(mapServiceRow),
     businessHoursByProfessional,
     blockedDates: (blockedDatesRes.data ?? []).map(mapBlockedDateRow),
     blockedRanges: (blockedRangesRes.data ?? []).map(mapBlockedRangeRow),
-    loadError: servicesRes.error || professionalsRes.error
-      ? "Não foi possível carregar os dados. Verifique sua internet."
+    loadError: coreError
+      ? `Não foi possível carregar os dados. Verifique sua internet. (detalhe técnico: ${(coreError as any).message ?? coreError})`
       : null,
   });
 }
