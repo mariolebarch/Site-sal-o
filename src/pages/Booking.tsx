@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Check, MessageCircle, CalendarCheck, RefreshCw } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, MessageCircle, CalendarCheck, RefreshCw, User } from "lucide-react";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/Footer";
 import { StepIndicator } from "../components/booking/StepIndicator";
@@ -20,17 +20,21 @@ const categoryIcons = {
   extra: IconExtra,
 };
 
-const STEPS = ["Procedimentos", "Data", "Horário", "Seus dados", "Confirmação"];
+const STEPS = ["Profissional", "Procedimentos", "Data", "Horário", "Seus dados", "Confirmação"];
 
 export function Booking() {
   const [params] = useSearchParams();
+  const professionals = useAppStore((s) => s.professionals);
   const services = useAppStore((s) => s.services);
   const addAppointment = useAppStore((s) => s.addAppointment);
   const loadingData = useAppStore((s) => s.loading);
   const loadError = useAppStore((s) => s.loadError);
   const reloadData = useAppStore((s) => s.reloadData);
 
+  const activeProfessionals = useMemo(() => professionals.filter((p) => p.active), [professionals]);
+
   const [step, setStep] = useState(0);
+  const [professionalId, setProfessionalId] = useState<string | null>(null);
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [date, setDate] = useState<string | null>(null);
   const [time, setTime] = useState<string | null>(null);
@@ -41,9 +45,13 @@ export function Booking() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
+  const professionalServices = useMemo(
+    () => services.filter((s) => s.professionalId === professionalId),
+    [services, professionalId]
+  );
   const selectedServices = useMemo(
-    () => services.filter((s) => selectedServiceIds.includes(s.id)),
-    [services, selectedServiceIds]
+    () => professionalServices.filter((s) => selectedServiceIds.includes(s.id)),
+    [professionalServices, selectedServiceIds]
   );
   const totalDuration = useMemo(
     () => selectedServices.reduce((sum, s) => sum + s.durationMin, 0),
@@ -54,21 +62,24 @@ export function Booking() {
     [selectedServices]
   );
   const serviceNamesLabel = selectedServices.map((s) => s.name).join(" + ");
+  const selectedProfessional = activeProfessionals.find((p) => p.id === professionalId) ?? null;
 
   useEffect(() => {
     const presetId = params.get("service");
     if (presetId) {
       const svc = services.find((s) => s.id === presetId && s.active);
       if (svc) {
+        setProfessionalId(svc.professionalId);
         setSelectedServiceIds([svc.id]);
-        setStep(1);
+        setStep(2);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [services.length]);
 
   function resetAll() {
     setStep(0);
+    setProfessionalId(null);
     setSelectedServiceIds([]);
     setDate(null);
     setTime(null);
@@ -76,6 +87,13 @@ export function Booking() {
     setClientPhone("");
     setNotes("");
     setDone(false);
+  }
+
+  function chooseProfessional(id: string) {
+    setProfessionalId(id);
+    setSelectedServiceIds([]);
+    setDate(null);
+    setTime(null);
   }
 
   function toggleService(id: string) {
@@ -86,15 +104,16 @@ export function Booking() {
   }
 
   function canAdvance() {
-    if (step === 0) return selectedServiceIds.length > 0;
-    if (step === 1) return !!date;
-    if (step === 2) return !!time;
-    if (step === 3) return clientName.trim().length > 1 && clientPhone.trim().length >= 8;
+    if (step === 0) return !!professionalId;
+    if (step === 1) return selectedServiceIds.length > 0;
+    if (step === 2) return !!date;
+    if (step === 3) return !!time;
+    if (step === 4) return clientName.trim().length > 1 && clientPhone.trim().length >= 8;
     return true;
   }
 
   async function handleConfirm() {
-    if (selectedServices.length === 0 || !date || !time) return;
+    if (!professionalId || selectedServices.length === 0 || !date || !time) return;
     const [h, m] = time.split(":").map(Number);
     const totalStart = h * 60 + m;
     const totalEnd = totalStart + totalDuration;
@@ -103,6 +122,7 @@ export function Booking() {
     setSubmitError("");
     setSubmitting(true);
     const result = await addAppointment({
+      professionalId,
       serviceIds: selectedServiceIds,
       date,
       startTime: time,
@@ -150,9 +170,10 @@ export function Booking() {
                 </div>
                 <h2 className="font-display text-2xl text-rose-900">Pré-agendamento realizado!</h2>
                 <p className="mt-2 text-ink-500 max-w-md mx-auto text-sm leading-relaxed">
-                  Seu horário para <strong>{serviceNamesLabel}</strong> em{" "}
+                  Seu horário para <strong>{serviceNamesLabel}</strong> com{" "}
+                  <strong>{selectedProfessional?.name}</strong> em{" "}
                   <strong>{date && formatDateBR(date)}</strong> às <strong>{time}</strong> foi reservado.
-                  Confirme com a Rosely pelo WhatsApp para garantir seu atendimento.
+                  Confirme pelo WhatsApp para garantir seu atendimento.
                 </p>
                 <div className="mt-7 flex flex-col sm:flex-row gap-3 justify-center">
                   <a
@@ -182,7 +203,7 @@ export function Booking() {
                     <ArrowLeft className="h-4 w-4" /> Voltar
                   </button>
 
-                  {step < 4 ? (
+                  {step < 5 ? (
                     <button
                       onClick={() => canAdvance() && setStep((s) => s + 1)}
                       disabled={!canAdvance()}
@@ -205,12 +226,12 @@ export function Booking() {
                   <p className="mb-4 text-center text-xs text-red-600 max-w-md mx-auto">{submitError}</p>
                 )}
 
-                {step === 0 && services.length === 0 && (
+                {step === 0 && activeProfessionals.length === 0 && (
                   <div className="text-center py-10 animate-fade-up">
                     <p className="text-sm text-ink-500 mb-4">
                       {loadingData
-                        ? "Carregando procedimentos..."
-                        : loadError ?? "Não conseguimos carregar os procedimentos agora."}
+                        ? "Carregando profissionais..."
+                        : loadError ?? "Não conseguimos carregar as profissionais agora."}
                     </p>
                     {!loadingData && (
                       <button
@@ -223,7 +244,29 @@ export function Booking() {
                   </div>
                 )}
 
-                {step === 0 && services.length > 0 && (
+                {step === 0 && activeProfessionals.length > 0 && (
+                  <div className="grid sm:grid-cols-2 gap-4 animate-fade-up max-w-md mx-auto">
+                    {activeProfessionals.map((p) => {
+                      const active = professionalId === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => chooseProfessional(p.id)}
+                          className={`flex items-center gap-4 rounded-2xl border p-5 text-left transition-all
+                            ${active ? "border-rose-500 bg-blush-50 shadow-soft" : "border-blush-200 hover:border-rose-300"}
+                          `}
+                        >
+                          <div className={`h-12 w-12 rounded-full flex items-center justify-center shrink-0 ${active ? "bg-rose-600 text-white" : "bg-blush-100 text-rose-600"}`}>
+                            <User className="h-6 w-6" />
+                          </div>
+                          <p className="font-semibold text-ink-900">{p.name}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {step === 1 && (
                   <div className="space-y-6 animate-fade-up">
                     {selectedServices.length > 0 && (
                       <div className="max-w-md mx-auto rounded-2xl bg-blush-50 border border-blush-200 px-4 py-3 text-sm flex items-center justify-between gap-3">
@@ -235,9 +278,14 @@ export function Booking() {
                         </span>
                       </div>
                     )}
+                    {professionalServices.length === 0 && (
+                      <p className="text-sm text-ink-500 text-center py-6">
+                        {selectedProfessional?.name} ainda não tem procedimentos cadastrados.
+                      </p>
+                    )}
                     {serviceCategories.map((cat) => {
                       const Icon = categoryIcons[cat.icon];
-                      const items = services.filter((s) => s.categoryId === cat.id && s.active);
+                      const items = professionalServices.filter((s) => s.categoryId === cat.id && s.active);
                       if (items.length === 0) return null;
                       return (
                         <div key={cat.id}>
@@ -285,19 +333,20 @@ export function Booking() {
                   </div>
                 )}
 
-                {step === 1 && (
+                {step === 2 && professionalId && (
                   <div className="animate-fade-up">
-                    <CalendarPicker selectedDate={date} onSelect={(d) => setDate(d)} />
+                    <CalendarPicker professionalId={professionalId} selectedDate={date} onSelect={(d) => setDate(d)} />
                   </div>
                 )}
 
-                {step === 2 && date && selectedServices.length > 0 && (
+                {step === 3 && date && professionalId && selectedServices.length > 0 && (
                   <div className="animate-fade-up">
                     <p className="text-sm text-ink-500 mb-4">
                       Horários disponíveis para <strong className="text-ink-900">{formatDateBR(date)}</strong>{" "}
                       ({totalDuration} min de duração total)
                     </p>
                     <TimeSlotGrid
+                      professionalId={professionalId}
                       date={date}
                       durationMin={totalDuration}
                       selectedTime={time}
@@ -306,7 +355,7 @@ export function Booking() {
                   </div>
                 )}
 
-                {step === 3 && (
+                {step === 4 && (
                   <div className="space-y-4 animate-fade-up max-w-md mx-auto">
                     <div>
                       <label className="block text-sm font-medium text-ink-700 mb-1.5">Nome completo</label>
@@ -339,11 +388,12 @@ export function Booking() {
                   </div>
                 )}
 
-                {step === 4 && date && time && (
+                {step === 5 && date && time && (
                   <div className="animate-fade-up max-w-md mx-auto">
                     <h3 className="font-display text-xl text-rose-900 mb-5">Confira os detalhes</h3>
                     <dl className="space-y-3 text-sm">
                       {[
+                        ["Profissional", selectedProfessional?.name ?? ""],
                         ["Procedimento(s)", serviceNamesLabel],
                         ["Duração total", `${totalDuration} min`],
                         ["Valor total", `R$ ${totalPrice.toFixed(2).replace(".", ",")}`],

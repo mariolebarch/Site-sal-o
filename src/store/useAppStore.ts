@@ -4,8 +4,17 @@ import type { DayHours, Weekday } from "../data/business";
 import { defaultBusinessHours } from "../data/business";
 import type { Service } from "../data/services";
 
+export interface Professional {
+  id: string;
+  email: string;
+  name: string;
+  role: "admin" | "staff";
+  active: boolean;
+}
+
 export interface Appointment {
   id: string;
+  professionalId: string;
   serviceIds: string[];
   date: string; // yyyy-MM-dd
   startTime: string; // HH:mm
@@ -19,12 +28,14 @@ export interface Appointment {
 
 export interface BlockedDate {
   id: string;
+  professionalId: string;
   date: string;
   reason?: string;
 }
 
 export interface BlockedRange {
   id: string;
+  professionalId: string;
   date: string;
   startTime: string;
   endTime: string;
@@ -37,15 +48,20 @@ interface ActionResult {
 }
 
 interface AppState {
+  professionals: Professional[];
+  currentProfessional: Professional | null;
+  isAdmin: boolean;
+
   services: Service[];
-  businessHours: Record<Weekday, DayHours>;
+  businessHoursByProfessional: Record<string, Record<Weekday, DayHours>>;
   blockedDates: BlockedDate[];
   blockedRanges: BlockedRange[];
-  appointments: Appointment[]; // populada apenas quando autenticado (admin)
+  appointments: Appointment[]; // populada apenas quando autenticada (respeitando RLS por profissional)
 
   loading: boolean;
   ready: boolean;
   loadError: string | null;
+  authError: string | null;
   isAdminAuthenticated: boolean;
 
   init: () => Promise<void>;
@@ -62,17 +78,20 @@ interface AppState {
   deleteAppointment: (id: string) => Promise<ActionResult>;
   fetchAppointments: () => Promise<void>;
 
-  addBlockedDate: (date: string, reason?: string) => Promise<ActionResult>;
+  addBlockedDate: (professionalId: string, date: string, reason?: string) => Promise<ActionResult>;
   removeBlockedDate: (id: string) => Promise<ActionResult>;
 
   addBlockedRange: (range: Omit<BlockedRange, "id">) => Promise<ActionResult>;
   removeBlockedRange: (id: string) => Promise<ActionResult>;
 
-  updateBusinessHours: (weekday: Weekday, hours: DayHours) => Promise<ActionResult>;
+  updateBusinessHours: (professionalId: string, weekday: Weekday, hours: DayHours) => Promise<ActionResult>;
 
   addService: (service: Omit<Service, "id"> & { id?: string }) => Promise<ActionResult>;
   updateService: (id: string, patch: Partial<Service>) => Promise<ActionResult>;
   removeService: (id: string) => Promise<ActionResult>;
+
+  addProfessional: (professional: { name: string; email: string; role: "admin" | "staff" }) => Promise<ActionResult>;
+  updateProfessional: (id: string, patch: { name?: string; role?: "admin" | "staff"; active?: boolean }) => Promise<ActionResult>;
 }
 
 function slugify(text: string) {
@@ -86,9 +105,14 @@ function slugify(text: string) {
   );
 }
 
+function mapProfessionalRow(row: any): Professional {
+  return { id: row.id, email: row.email, name: row.name, role: row.role, active: row.active };
+}
+
 function mapServiceRow(row: any): Service {
   return {
     id: row.id,
+    professionalId: row.professional_id,
     categoryId: row.category_id,
     name: row.name,
     description: row.description,
@@ -101,6 +125,7 @@ function mapServiceRow(row: any): Service {
 function mapAppointmentRow(row: any): Appointment {
   return {
     id: row.id,
+    professionalId: row.professional_id,
     serviceIds: row.service_ids ?? (row.service_id ? [row.service_id] : []),
     date: row.date,
     startTime: row.start_time,
@@ -114,12 +139,13 @@ function mapAppointmentRow(row: any): Appointment {
 }
 
 function mapBlockedDateRow(row: any): BlockedDate {
-  return { id: row.id, date: row.date, reason: row.reason ?? undefined };
+  return { id: row.id, professionalId: row.professional_id, date: row.date, reason: row.reason ?? undefined };
 }
 
 function mapBlockedRangeRow(row: any): BlockedRange {
   return {
     id: row.id,
+    professionalId: row.professional_id,
     date: row.date,
     startTime: row.start_time,
     endTime: row.end_time,
@@ -127,10 +153,17 @@ function mapBlockedRangeRow(row: any): BlockedRange {
   };
 }
 
+function findProfessionalByEmail(professionals: Professional[], email?: string | null): Professional | null {
+  if (!email) return null;
+  const lower = email.toLowerCase();
+  return professionals.find((p) => p.email.toLowerCase() === lower) ?? null;
+}
+
 async function fetchCoreOnce() {
   return Promise.all([
+    supabase.from("professionals").select("*").order("created_at"),
     supabase.from("services").select("*").order("category_id"),
-    supabase.from("app_settings").select("*").eq("id", "main").maybeSingle(),
+    supabase.from("professional_hours").select("*"),
     supabase.from("blocked_dates").select("*"),
     supabase.from("blocked_ranges").select("*"),
   ]);
@@ -153,15 +186,40 @@ async function fetchCoreWithRetry(retries = 2) {
   return result;
 }
 
+function applyCoreResult(
+  set: (partial: Partial<AppState>) => void,
+  result: Awaited<ReturnType<typeof fetchCoreOnce>>
+) {
+  const [professionalsRes, servicesRes, hoursRes, blockedDatesRes, blockedRangesRes] = result;
+  const businessHoursByProfessional: Record<string, Record<Weekday, DayHours>> = {};
+  for (const row of hoursRes.data ?? []) {
+    businessHoursByProfessional[row.professional_id] = row.business_hours ?? defaultBusinessHours;
+  }
+  set({
+    professionals: (professionalsRes.data ?? []).map(mapProfessionalRow),
+    services: (servicesRes.data ?? []).map(mapServiceRow),
+    businessHoursByProfessional,
+    blockedDates: (blockedDatesRes.data ?? []).map(mapBlockedDateRow),
+    blockedRanges: (blockedRangesRes.data ?? []).map(mapBlockedRangeRow),
+    loadError: servicesRes.error || professionalsRes.error
+      ? "Não foi possível carregar os dados. Verifique sua internet."
+      : null,
+  });
+}
+
 export const useAppStore = create<AppState>()((set, get) => ({
+  professionals: [],
+  currentProfessional: null,
+  isAdmin: false,
   services: [],
-  businessHours: defaultBusinessHours,
+  businessHoursByProfessional: {},
   blockedDates: [],
   blockedRanges: [],
   appointments: [],
   loading: false,
   ready: false,
   loadError: null,
+  authError: null,
   isAdminAuthenticated: false,
 
   init: async () => {
@@ -172,61 +230,87 @@ export const useAppStore = create<AppState>()((set, get) => ({
       fetchCoreWithRetry(),
       supabase.auth.getSession(),
     ]);
-    const [servicesRes, settingsRes, blockedDatesRes, blockedRangesRes] = coreResult;
+    applyCoreResult(set, coreResult);
+
+    const session = sessionRes.data.session;
+    const professionals = get().professionals;
+    const currentProfessional = session ? findProfessionalByEmail(professionals, session.user.email) : null;
+
+    if (session && !currentProfessional) {
+      await supabase.auth.signOut();
+      set({
+        isAdminAuthenticated: false,
+        currentProfessional: null,
+        isAdmin: false,
+        authError: "Sua conta não está associada a nenhuma profissional cadastrada. Fale com a administradora.",
+        loading: false,
+        ready: true,
+      });
+      return;
+    }
 
     set({
-      services: (servicesRes.data ?? []).map(mapServiceRow),
-      businessHours: settingsRes.data?.business_hours ?? defaultBusinessHours,
-      blockedDates: (blockedDatesRes.data ?? []).map(mapBlockedDateRow),
-      blockedRanges: (blockedRangesRes.data ?? []).map(mapBlockedRangeRow),
-      loadError: servicesRes.error
-        ? "Não foi possível carregar os procedimentos. Verifique sua internet."
-        : null,
-      isAdminAuthenticated: !!sessionRes.data.session,
+      isAdminAuthenticated: !!session,
+      currentProfessional,
+      isAdmin: currentProfessional?.role === "admin",
       loading: false,
       ready: true,
     });
 
-    if (sessionRes.data.session) {
+    if (session && currentProfessional) {
       get().fetchAppointments();
     }
 
-    supabase.auth.onAuthStateChange((_event, session) => {
-      set({ isAdminAuthenticated: !!session });
-      if (session) {
-        get().fetchAppointments();
-      } else {
-        set({ appointments: [] });
+    supabase.auth.onAuthStateChange(async (_event: string, newSession: { user: { email?: string } } | null) => {
+      if (!newSession) {
+        set({ isAdminAuthenticated: false, currentProfessional: null, isAdmin: false, appointments: [] });
+        return;
       }
+      const prof = findProfessionalByEmail(get().professionals, newSession.user.email);
+      if (!prof) {
+        await supabase.auth.signOut();
+        set({
+          isAdminAuthenticated: false,
+          currentProfessional: null,
+          isAdmin: false,
+          authError: "Sua conta não está associada a nenhuma profissional cadastrada. Fale com a administradora.",
+        });
+        return;
+      }
+      set({ isAdminAuthenticated: true, currentProfessional: prof, isAdmin: prof.role === "admin" });
+      get().fetchAppointments();
     });
   },
 
   reloadData: async () => {
     set({ loading: true });
-    const [servicesRes, settingsRes, blockedDatesRes, blockedRangesRes] = await fetchCoreWithRetry();
-    set({
-      services: (servicesRes.data ?? []).map(mapServiceRow),
-      businessHours: settingsRes.data?.business_hours ?? defaultBusinessHours,
-      blockedDates: (blockedDatesRes.data ?? []).map(mapBlockedDateRow),
-      blockedRanges: (blockedRangesRes.data ?? []).map(mapBlockedRangeRow),
-      loadError: servicesRes.error
-        ? "Não foi possível carregar os procedimentos. Verifique sua internet."
-        : null,
-      loading: false,
-    });
+    const result = await fetchCoreWithRetry();
+    applyCoreResult(set, result);
+    set({ loading: false });
   },
 
   login: async (email, password) => {
+    set({ authError: null });
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { ok: false, error: error.message };
-    set({ isAdminAuthenticated: true });
+
+    const prof = findProfessionalByEmail(get().professionals, email);
+    if (!prof) {
+      await supabase.auth.signOut();
+      return { ok: false, error: "Sua conta não está associada a nenhuma profissional cadastrada." };
+    }
+    if (!prof.active) {
+      await supabase.auth.signOut();
+      return { ok: false, error: "Este acesso foi desativado. Fale com a administradora." };
+    }
+    set({ isAdminAuthenticated: true, currentProfessional: prof, isAdmin: prof.role === "admin" });
     await get().fetchAppointments();
     return { ok: true };
   },
 
   logout: async () => {
     await supabase.auth.signOut();
-    set({ isAdminAuthenticated: false, appointments: [] });
+    set({ isAdminAuthenticated: false, currentProfessional: null, isAdmin: false, appointments: [] });
   },
 
   changePassword: async (newPassword) => {
@@ -250,6 +334,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const { data, error } = await supabase
       .from("appointments")
       .insert({
+        professional_id: a.professionalId,
         service_ids: a.serviceIds,
         date: a.date,
         start_time: a.startTime,
@@ -287,10 +372,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
     return { ok: true };
   },
 
-  addBlockedDate: async (date, reason) => {
+  addBlockedDate: async (professionalId, date, reason) => {
     const { data, error } = await supabase
       .from("blocked_dates")
-      .insert({ date, reason: reason ?? null })
+      .insert({ professional_id: professionalId, date, reason: reason ?? null })
       .select()
       .single();
     if (error) return { ok: false, error: error.message };
@@ -309,6 +394,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const { data, error } = await supabase
       .from("blocked_ranges")
       .insert({
+        professional_id: range.professionalId,
         date: range.date,
         start_time: range.startTime,
         end_time: range.endTime,
@@ -328,14 +414,16 @@ export const useAppStore = create<AppState>()((set, get) => ({
     return { ok: true };
   },
 
-  updateBusinessHours: async (weekday, hours) => {
-    const nextHours = { ...get().businessHours, [weekday]: hours };
+  updateBusinessHours: async (professionalId, weekday, hours) => {
+    const current = get().businessHoursByProfessional[professionalId] ?? defaultBusinessHours;
+    const nextHours = { ...current, [weekday]: hours };
     const { error } = await supabase
-      .from("app_settings")
-      .update({ business_hours: nextHours })
-      .eq("id", "main");
+      .from("professional_hours")
+      .upsert({ professional_id: professionalId, business_hours: nextHours });
     if (error) return { ok: false, error: error.message };
-    set({ businessHours: nextHours });
+    set((s) => ({
+      businessHoursByProfessional: { ...s.businessHoursByProfessional, [professionalId]: nextHours },
+    }));
     return { ok: true };
   },
 
@@ -345,6 +433,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       .from("services")
       .insert({
         id,
+        professional_id: service.professionalId,
         category_id: service.categoryId,
         name: service.name,
         description: service.description,
@@ -383,6 +472,31 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const { error } = await supabase.from("services").delete().eq("id", id);
     if (error) return { ok: false, error: error.message };
     set((s) => ({ services: s.services.filter((sv) => sv.id !== id) }));
+    return { ok: true };
+  },
+
+  addProfessional: async (professional) => {
+    const { data, error } = await supabase
+      .from("professionals")
+      .insert({ name: professional.name, email: professional.email.toLowerCase().trim(), role: professional.role })
+      .select()
+      .single();
+    if (error) return { ok: false, error: error.message };
+    const prof = mapProfessionalRow(data);
+    const defaultHours = get().businessHoursByProfessional[get().currentProfessional?.id ?? ""] ?? defaultBusinessHours;
+    await supabase.from("professional_hours").upsert({ professional_id: prof.id, business_hours: defaultHours });
+    set((s) => ({
+      professionals: [...s.professionals, prof],
+      businessHoursByProfessional: { ...s.businessHoursByProfessional, [prof.id]: defaultHours },
+    }));
+    return { ok: true };
+  },
+
+  updateProfessional: async (id, patch) => {
+    const { data, error } = await supabase.from("professionals").update(patch).eq("id", id).select().single();
+    if (error) return { ok: false, error: error.message };
+    const prof = mapProfessionalRow(data);
+    set((s) => ({ professionals: s.professionals.map((p) => (p.id === id ? prof : p)) }));
     return { ok: true };
   },
 }));

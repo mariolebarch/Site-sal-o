@@ -20,6 +20,8 @@ export function Login() {
     setLoading(false);
     if (result.ok) {
       navigate("/admin");
+    } else if (result.error && !result.error.toLowerCase().includes("invalid login credentials")) {
+      setError(result.error);
     } else {
       setError("E-mail ou senha incorretos. Tente novamente.");
     }

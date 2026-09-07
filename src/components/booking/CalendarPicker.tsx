@@ -2,9 +2,10 @@ import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { getWeekday, isPastDate, toDateInputValue } from "../../utils/slots";
-import { weekdayShort } from "../../data/business";
+import { weekdayShort, defaultBusinessHours } from "../../data/business";
 
 interface CalendarPickerProps {
+  professionalId: string;
   selectedDate: string | null;
   onSelect: (date: string) => void;
 }
@@ -14,15 +15,21 @@ const MONTH_NAMES = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
 
-export function CalendarPicker({ selectedDate, onSelect }: CalendarPickerProps) {
-  const businessHours = useAppStore((s) => s.businessHours);
+export function CalendarPicker({ professionalId, selectedDate, onSelect }: CalendarPickerProps) {
+  const businessHours = useAppStore((s) => s.businessHoursByProfessional[professionalId] ?? defaultBusinessHours);
   const blockedDates = useAppStore((s) => s.blockedDates);
 
   const today = useMemo(() => new Date(), []);
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
 
-  const blockedSet = useMemo(() => new Set(blockedDates.map((b) => b.date)), [blockedDates]);
+  const blockedSet = useMemo(
+    () =>
+      new Set(
+        blockedDates.filter((b) => b.professionalId === professionalId).map((b) => b.date)
+      ),
+    [blockedDates, professionalId]
+  );
 
   const firstDayOfMonth = new Date(viewYear, viewMonth, 1);
   const mondayFirstOffset = (firstDayOfMonth.getDay() + 6) % 7;

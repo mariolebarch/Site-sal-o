@@ -6,10 +6,15 @@ import { formatDateBR, toDateInputValue } from "../../utils/slots";
 export function AdminBlocking() {
   const blockedDates = useAppStore((s) => s.blockedDates);
   const blockedRanges = useAppStore((s) => s.blockedRanges);
+  const professionals = useAppStore((s) => s.professionals);
+  const currentProfessional = useAppStore((s) => s.currentProfessional);
+  const isAdmin = useAppStore((s) => s.isAdmin);
   const addBlockedDate = useAppStore((s) => s.addBlockedDate);
   const removeBlockedDate = useAppStore((s) => s.removeBlockedDate);
   const addBlockedRange = useAppStore((s) => s.addBlockedRange);
   const removeBlockedRange = useAppStore((s) => s.removeBlockedRange);
+
+  const [scopeProfessionalId, setScopeProfessionalId] = useState(currentProfessional?.id ?? "");
 
   const today = toDateInputValue(new Date());
 
@@ -23,11 +28,14 @@ export function AdminBlocking() {
   const [rangeError, setRangeError] = useState("");
   const [dateError, setDateError] = useState("");
 
+  const scopedDates = blockedDates.filter((b) => b.professionalId === scopeProfessionalId);
+  const scopedRanges = blockedRanges.filter((r) => r.professionalId === scopeProfessionalId);
+
   async function handleBlockDate(e: FormEvent) {
     e.preventDefault();
     setDateError("");
-    if (blockedDates.some((b) => b.date === dateToBlock)) return;
-    const result = await addBlockedDate(dateToBlock, dateReason.trim() || undefined);
+    if (scopedDates.some((b) => b.date === dateToBlock)) return;
+    const result = await addBlockedDate(scopeProfessionalId, dateToBlock, dateReason.trim() || undefined);
     if (!result.ok) {
       setDateError("Não foi possível bloquear a data. Tente novamente.");
       return;
@@ -43,6 +51,7 @@ export function AdminBlocking() {
       return;
     }
     const result = await addBlockedRange({
+      professionalId: scopeProfessionalId,
       date: rangeDate,
       startTime: rangeStart,
       endTime: rangeEnd,
@@ -55,16 +64,29 @@ export function AdminBlocking() {
     setRangeReason("");
   }
 
-  const sortedDates = [...blockedDates].sort((a, b) => a.date.localeCompare(b.date));
-  const sortedRanges = [...blockedRanges].sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
+  const sortedDates = [...scopedDates].sort((a, b) => a.date.localeCompare(b.date));
+  const sortedRanges = [...scopedRanges].sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="font-display text-2xl sm:text-3xl text-rose-900">Bloqueio de horários</h1>
-        <p className="text-sm text-ink-500 mt-1">
-          Bloqueie dias inteiros (folgas, feriados) ou apenas um intervalo de horário específico (almoço, compromissos).
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display text-2xl sm:text-3xl text-rose-900">Bloqueio de horários</h1>
+          <p className="text-sm text-ink-500 mt-1">
+            Bloqueie dias inteiros (folgas, feriados) ou apenas um intervalo de horário específico (almoço, compromissos).
+          </p>
+        </div>
+        {isAdmin && (
+          <select
+            value={scopeProfessionalId}
+            onChange={(e) => setScopeProfessionalId(e.target.value)}
+            className="rounded-lg border border-blush-300 px-3 py-2 text-sm"
+          >
+            {professionals.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">

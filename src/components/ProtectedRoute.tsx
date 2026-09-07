@@ -9,3 +9,15 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   }
   return <>{children}</>;
 }
+
+export function AdminOnlyRoute({ children }: { children: ReactNode }) {
+  const isAuthenticated = useAppStore((s) => s.isAdminAuthenticated);
+  const isAdmin = useAppStore((s) => s.isAdmin);
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  if (!isAdmin) {
+    return <Navigate to="/admin" replace />;
+  }
+  return <>{children}</>;
+}

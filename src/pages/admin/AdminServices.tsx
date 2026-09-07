@@ -3,23 +3,38 @@ import { Plus, Trash2, Pencil, X, Check } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { serviceCategories } from "../../data/services";
 
-const emptyForm = {
-  categoryId: serviceCategories[0].id,
-  name: "",
-  description: "",
-  durationMin: 30,
-  price: 0,
-};
+function emptyForm(professionalId: string) {
+  return {
+    professionalId,
+    categoryId: serviceCategories[0].id,
+    name: "",
+    description: "",
+    durationMin: 30,
+    price: 0,
+  };
+}
 
 export function AdminServices() {
   const services = useAppStore((s) => s.services);
+  const professionals = useAppStore((s) => s.professionals);
+  const currentProfessional = useAppStore((s) => s.currentProfessional);
+  const isAdmin = useAppStore((s) => s.isAdmin);
   const addService = useAppStore((s) => s.addService);
   const updateService = useAppStore((s) => s.updateService);
   const removeService = useAppStore((s) => s.removeService);
 
-  const [form, setForm] = useState(emptyForm);
+  const [scopeProfessionalId, setScopeProfessionalId] = useState(currentProfessional?.id ?? "");
+  const [form, setForm] = useState(() => emptyForm(scopeProfessionalId));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState("");
+
+  const scopedServices = services.filter((s) => s.professionalId === scopeProfessionalId);
+
+  function changeScope(id: string) {
+    setScopeProfessionalId(id);
+    setEditingId(null);
+    setForm(emptyForm(id));
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -27,32 +42,52 @@ export function AdminServices() {
     if (!form.name.trim()) return;
     const result = editingId
       ? await updateService(editingId, form)
-      : await addService({ ...form, active: true });
+      : await addService({ ...form, professionalId: scopeProfessionalId, active: true });
     if (!result.ok) {
       setError("Não foi possível salvar o procedimento. Tente novamente.");
       return;
     }
     setEditingId(null);
-    setForm(emptyForm);
+    setForm(emptyForm(scopeProfessionalId));
   }
 
   function startEdit(id: string) {
     const s = services.find((x) => x.id === id);
     if (!s) return;
-    setForm({ categoryId: s.categoryId, name: s.name, description: s.description, durationMin: s.durationMin, price: s.price });
+    setForm({
+      professionalId: s.professionalId,
+      categoryId: s.categoryId,
+      name: s.name,
+      description: s.description,
+      durationMin: s.durationMin,
+      price: s.price,
+    });
     setEditingId(id);
   }
 
   function cancelEdit() {
     setEditingId(null);
-    setForm(emptyForm);
+    setForm(emptyForm(scopeProfessionalId));
   }
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="font-display text-2xl sm:text-3xl text-rose-900">Serviços</h1>
-        <p className="text-sm text-ink-500 mt-1">Gerencie os procedimentos, duração e valores exibidos no site e no agendamento.</p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display text-2xl sm:text-3xl text-rose-900">Serviços</h1>
+          <p className="text-sm text-ink-500 mt-1">Gerencie os procedimentos, duração e valores exibidos no site e no agendamento.</p>
+        </div>
+        {isAdmin && (
+          <select
+            value={scopeProfessionalId}
+            onChange={(e) => changeScope(e.target.value)}
+            className="rounded-lg border border-blush-300 px-3 py-2 text-sm"
+          >
+            {professionals.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-blush-200 p-6 shadow-soft space-y-4">
@@ -135,7 +170,7 @@ export function AdminServices() {
 
       <div className="space-y-6">
         {serviceCategories.map((cat) => {
-          const items = services.filter((s) => s.categoryId === cat.id);
+          const items = scopedServices.filter((s) => s.categoryId === cat.id);
           if (items.length === 0) return null;
           return (
             <div key={cat.id}>

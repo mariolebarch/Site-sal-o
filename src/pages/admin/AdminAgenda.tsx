@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Trash2, XCircle, Phone, Plus, X, BellRing, Check } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { formatDateBR, toDateInputValue } from "../../utils/slots";
@@ -6,43 +6,65 @@ import { serviceCategories } from "../../data/services";
 import { TimeSlotGrid } from "../../components/booking/TimeSlotGrid";
 import { buildReminderMessage, whatsappLinkToPhone } from "../../utils/whatsapp";
 
-const emptyManualForm = {
-  serviceIds: [] as string[],
-  date: toDateInputValue(new Date()),
-  time: null as string | null,
-  clientName: "",
-  clientPhone: "",
-  notes: "",
-};
-
 export function AdminAgenda() {
   const appointments = useAppStore((s) => s.appointments);
   const services = useAppStore((s) => s.services);
+  const professionals = useAppStore((s) => s.professionals);
+  const currentProfessional = useAppStore((s) => s.currentProfessional);
+  const isAdmin = useAppStore((s) => s.isAdmin);
   const cancelAppointment = useAppStore((s) => s.cancelAppointment);
   const deleteAppointment = useAppStore((s) => s.deleteAppointment);
   const addAppointment = useAppStore((s) => s.addAppointment);
 
   const [filterDate, setFilterDate] = useState(toDateInputValue(new Date()));
   const [showAll, setShowAll] = useState(false);
+  const [filterProfessionalId, setFilterProfessionalId] = useState("all");
+
+  const emptyManualForm = () => ({
+    professionalId: isAdmin ? "" : currentProfessional?.id ?? "",
+    serviceIds: [] as string[],
+    date: toDateInputValue(new Date()),
+    time: null as string | null,
+    clientName: "",
+    clientPhone: "",
+    notes: "",
+  });
 
   const [showManualForm, setShowManualForm] = useState(false);
   const [manualForm, setManualForm] = useState(emptyManualForm);
   const [manualError, setManualError] = useState("");
   const [manualSubmitting, setManualSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (!isAdmin && currentProfessional) {
+      setManualForm((f) => (f.professionalId ? f : { ...f, professionalId: currentProfessional.id }));
+    }
+  }, [isAdmin, currentProfessional]);
+
   const list = useMemo(() => {
-    const filtered = showAll ? appointments : appointments.filter((a) => a.date === filterDate);
+    let filtered = showAll ? appointments : appointments.filter((a) => a.date === filterDate);
+    if (isAdmin && filterProfessionalId !== "all") {
+      filtered = filtered.filter((a) => a.professionalId === filterProfessionalId);
+    }
     return [...filtered].sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
-  }, [appointments, filterDate, showAll]);
+  }, [appointments, filterDate, showAll, isAdmin, filterProfessionalId]);
 
   function serviceNames(ids: string[]) {
     const names = ids.map((id) => services.find((s) => s.id === id)?.name).filter(Boolean) as string[];
     return names.length > 0 ? names.join(" + ") : "Procedimento removido";
   }
 
+  function professionalName(id: string) {
+    return professionals.find((p) => p.id === id)?.name ?? "";
+  }
+
+  const manualProfessionalServices = useMemo(
+    () => services.filter((s) => s.professionalId === manualForm.professionalId),
+    [services, manualForm.professionalId]
+  );
   const manualSelectedServices = useMemo(
-    () => services.filter((s) => manualForm.serviceIds.includes(s.id)),
-    [services, manualForm.serviceIds]
+    () => manualProfessionalServices.filter((s) => manualForm.serviceIds.includes(s.id)),
+    [manualProfessionalServices, manualForm.serviceIds]
   );
   const manualTotalDuration = manualSelectedServices.reduce((sum, s) => sum + s.durationMin, 0);
 
@@ -55,13 +77,17 @@ export function AdminAgenda() {
   }
 
   function openManualForm() {
-    setManualForm(emptyManualForm);
+    setManualForm(emptyManualForm());
     setManualError("");
     setShowManualForm(true);
   }
 
   async function handleManualSubmit() {
     setManualError("");
+    if (!manualForm.professionalId) {
+      setManualError("Selecione a profissional.");
+      return;
+    }
     if (manualForm.serviceIds.length === 0) {
       setManualError("Selecione ao menos um procedimento.");
       return;
@@ -82,6 +108,7 @@ export function AdminAgenda() {
 
     setManualSubmitting(true);
     const result = await addAppointment({
+      professionalId: manualForm.professionalId,
       serviceIds: manualForm.serviceIds,
       date: manualForm.date,
       startTime: manualForm.time,
@@ -101,7 +128,7 @@ export function AdminAgenda() {
       return;
     }
     setShowManualForm(false);
-    setManualForm(emptyManualForm);
+    setManualForm(emptyManualForm());
   }
 
   return (
@@ -134,48 +161,68 @@ export function AdminAgenda() {
             </button>
           </div>
 
-          <div>
-            <p className="text-xs font-medium text-ink-500 mb-2">Procedimentos</p>
-            <div className="grid sm:grid-cols-2 gap-4">
-              {serviceCategories.map((cat) => {
-                const items = services.filter((s) => s.categoryId === cat.id && s.active);
-                if (items.length === 0) return null;
-                return (
-                  <div key={cat.id}>
-                    <p className="text-xs font-semibold text-rose-700 mb-1.5">{cat.name}</p>
-                    <div className="space-y-1.5">
-                      {items.map((s) => {
-                        const active = manualForm.serviceIds.includes(s.id);
-                        return (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={() => toggleManualService(s.id)}
-                            className={`w-full flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left text-sm transition-colors
-                              ${active ? "border-rose-500 bg-blush-50" : "border-blush-200 hover:border-rose-300"}
-                            `}
-                          >
-                            <span
-                              className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 ${
-                                active ? "bg-rose-600 border-rose-600 text-white" : "border-blush-300"
-                              }`}
-                            >
-                              {active && <Check className="h-3 w-3" />}
-                            </span>
-                            <span className="text-ink-900">{s.name}</span>
-                            <span className="ml-auto text-xs text-ink-500 shrink-0">{s.durationMin} min</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
+          {isAdmin && (
+            <div>
+              <label className="block text-xs font-medium text-ink-500 mb-1">Profissional</label>
+              <select
+                value={manualForm.professionalId}
+                onChange={(e) =>
+                  setManualForm((f) => ({ ...f, professionalId: e.target.value, serviceIds: [], time: null }))
+                }
+                className="w-full sm:w-64 rounded-lg border border-blush-300 px-3 py-2 text-sm"
+              >
+                <option value="">Selecione...</option>
+                {professionals.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
             </div>
-            {manualSelectedServices.length > 0 && (
-              <p className="mt-2 text-xs text-ink-500">Duração total: {manualTotalDuration} min</p>
-            )}
-          </div>
+          )}
+
+          {manualForm.professionalId && (
+            <div>
+              <p className="text-xs font-medium text-ink-500 mb-2">Procedimentos</p>
+              <div className="grid sm:grid-cols-2 gap-4">
+                {serviceCategories.map((cat) => {
+                  const items = manualProfessionalServices.filter((s) => s.categoryId === cat.id && s.active);
+                  if (items.length === 0) return null;
+                  return (
+                    <div key={cat.id}>
+                      <p className="text-xs font-semibold text-rose-700 mb-1.5">{cat.name}</p>
+                      <div className="space-y-1.5">
+                        {items.map((s) => {
+                          const active = manualForm.serviceIds.includes(s.id);
+                          return (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => toggleManualService(s.id)}
+                              className={`w-full flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left text-sm transition-colors
+                                ${active ? "border-rose-500 bg-blush-50" : "border-blush-200 hover:border-rose-300"}
+                              `}
+                            >
+                              <span
+                                className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 ${
+                                  active ? "bg-rose-600 border-rose-600 text-white" : "border-blush-300"
+                                }`}
+                              >
+                                {active && <Check className="h-3 w-3" />}
+                              </span>
+                              <span className="text-ink-900">{s.name}</span>
+                              <span className="ml-auto text-xs text-ink-500 shrink-0">{s.durationMin} min</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {manualSelectedServices.length > 0 && (
+                <p className="mt-2 text-xs text-ink-500">Duração total: {manualTotalDuration} min</p>
+              )}
+            </div>
+          )}
 
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
@@ -216,12 +263,13 @@ export function AdminAgenda() {
             </div>
           </div>
 
-          {manualSelectedServices.length > 0 && (
+          {manualForm.professionalId && manualSelectedServices.length > 0 && (
             <div>
               <p className="text-xs font-medium text-ink-500 mb-2">
                 Horário disponível em {formatDateBR(manualForm.date)}
               </p>
               <TimeSlotGrid
+                professionalId={manualForm.professionalId}
                 date={manualForm.date}
                 durationMin={manualTotalDuration}
                 selectedTime={manualForm.time}
@@ -259,6 +307,18 @@ export function AdminAgenda() {
           disabled={showAll}
           className="rounded-lg border border-blush-300 px-3 py-1.5 text-sm disabled:opacity-40"
         />
+        {isAdmin && (
+          <select
+            value={filterProfessionalId}
+            onChange={(e) => setFilterProfessionalId(e.target.value)}
+            className="rounded-lg border border-blush-300 px-3 py-1.5 text-sm"
+          >
+            <option value="all">Todas as profissionais</option>
+            {professionals.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        )}
         <label className="ml-auto inline-flex items-center gap-2 text-sm text-ink-700">
           <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} />
           Ver todos os agendamentos
@@ -275,6 +335,7 @@ export function AdminAgenda() {
                 <tr>
                   <th className="text-left font-semibold px-5 py-3">Cliente</th>
                   <th className="text-left font-semibold px-5 py-3">Procedimento</th>
+                  {isAdmin && <th className="text-left font-semibold px-5 py-3">Profissional</th>}
                   <th className="text-left font-semibold px-5 py-3">Data</th>
                   <th className="text-left font-semibold px-5 py-3">Horário</th>
                   <th className="text-left font-semibold px-5 py-3">Status</th>
@@ -296,6 +357,7 @@ export function AdminAgenda() {
                       </a>
                     </td>
                     <td className="px-5 py-3 text-ink-700">{serviceNames(a.serviceIds)}</td>
+                    {isAdmin && <td className="px-5 py-3 text-ink-700">{professionalName(a.professionalId)}</td>}
                     <td className="px-5 py-3 text-ink-700 whitespace-nowrap">{formatDateBR(a.date)}</td>
                     <td className="px-5 py-3 text-ink-700">{a.startTime} – {a.endTime}</td>
                     <td className="px-5 py-3">

@@ -10,23 +10,27 @@ import {
   LogOut,
   Menu,
   X,
+  Users,
 } from "lucide-react";
 import { Monogram } from "../../components/decor/Icons";
 import { useAppStore } from "../../store/useAppStore";
 
-const navItems = [
-  { to: "/admin", label: "Painel", icon: LayoutDashboard, end: true },
-  { to: "/admin/agenda", label: "Agenda", icon: CalendarDays },
-  { to: "/admin/bloqueios", label: "Bloqueios", icon: Ban },
-  { to: "/admin/servicos", label: "Serviços", icon: Sparkles },
-  { to: "/admin/horarios", label: "Horário de funcionamento", icon: Clock },
-  { to: "/admin/configuracoes", label: "Configurações", icon: Settings },
-];
-
 export function AdminLayout() {
   const navigate = useNavigate();
   const logout = useAppStore((s) => s.logout);
+  const currentProfessional = useAppStore((s) => s.currentProfessional);
+  const isAdmin = useAppStore((s) => s.isAdmin);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const navItems = [
+    { to: "/admin", label: "Painel", icon: LayoutDashboard, end: true },
+    { to: "/admin/agenda", label: "Agenda", icon: CalendarDays },
+    { to: "/admin/bloqueios", label: "Bloqueios", icon: Ban },
+    { to: "/admin/servicos", label: "Serviços", icon: Sparkles },
+    { to: "/admin/horarios", label: "Horário de funcionamento", icon: Clock },
+    { to: "/admin/configuracoes", label: "Configurações", icon: Settings },
+    ...(isAdmin ? [{ to: "/admin/profissionais", label: "Profissionais", icon: Users }] : []),
+  ];
 
   async function handleLogout() {
     await logout();
@@ -36,7 +40,12 @@ export function AdminLayout() {
   return (
     <div className="min-h-screen bg-cream-100 flex">
       <aside className="hidden lg:flex flex-col w-64 shrink-0 bg-rose-900 text-blush-100 min-h-screen sticky top-0">
-        <SidebarContent onNavigate={() => {}} onLogout={handleLogout} />
+        <SidebarContent
+          navItems={navItems}
+          professionalName={currentProfessional?.name}
+          onNavigate={() => {}}
+          onLogout={handleLogout}
+        />
       </aside>
 
       {mobileOpen && (
@@ -50,7 +59,12 @@ export function AdminLayout() {
             >
               <X className="h-5 w-5" />
             </button>
-            <SidebarContent onNavigate={() => setMobileOpen(false)} onLogout={handleLogout} />
+            <SidebarContent
+              navItems={navItems}
+              professionalName={currentProfessional?.name}
+              onNavigate={() => setMobileOpen(false)}
+              onLogout={handleLogout}
+            />
           </aside>
         </div>
       )}
@@ -71,13 +85,30 @@ export function AdminLayout() {
   );
 }
 
-function SidebarContent({ onNavigate, onLogout }: { onNavigate: () => void; onLogout: () => void }) {
+interface NavItem {
+  to: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  end?: boolean;
+}
+
+function SidebarContent({
+  navItems,
+  professionalName,
+  onNavigate,
+  onLogout,
+}: {
+  navItems: NavItem[];
+  professionalName?: string;
+  onNavigate: () => void;
+  onLogout: () => void;
+}) {
   return (
     <>
       <Link to="/" className="flex items-center gap-2 px-6 py-6">
         <Monogram variant="light" className="h-9 w-9" />
         <div>
-          <p className="font-display text-base text-cream-50 leading-tight">Studio Rosely</p>
+          <p className="font-display text-base text-cream-50 leading-tight">{professionalName ?? "Studio Rosely"}</p>
           <p className="text-[11px] text-blush-200/70">Painel administrativo</p>
         </div>
       </Link>

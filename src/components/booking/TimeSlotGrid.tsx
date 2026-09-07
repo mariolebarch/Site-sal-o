@@ -1,19 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import { supabase } from "../../lib/supabaseClient";
+import { defaultBusinessHours } from "../../data/business";
 import { generateTimeSlots, getWeekday, toDateInputValue, type BookedRange } from "../../utils/slots";
 
 interface TimeSlotGridProps {
+  professionalId: string;
   date: string;
   durationMin: number;
   selectedTime: string | null;
   onSelect: (time: string) => void;
 }
 
-export function TimeSlotGrid({ date, durationMin, selectedTime, onSelect }: TimeSlotGridProps) {
-  const businessHours = useAppStore((s) => s.businessHours);
-  const blockedDates = useAppStore((s) => s.blockedDates);
-  const blockedRanges = useAppStore((s) => s.blockedRanges);
+export function TimeSlotGrid({ professionalId, date, durationMin, selectedTime, onSelect }: TimeSlotGridProps) {
+  const businessHours = useAppStore((s) => s.businessHoursByProfessional[professionalId] ?? defaultBusinessHours);
+  const allBlockedDates = useAppStore((s) => s.blockedDates);
+  const allBlockedRanges = useAppStore((s) => s.blockedRanges);
+  const blockedDates = useMemo(
+    () => allBlockedDates.filter((b) => b.professionalId === professionalId),
+    [allBlockedDates, professionalId]
+  );
+  const blockedRanges = useMemo(
+    () => allBlockedRanges.filter((r) => r.professionalId === professionalId),
+    [allBlockedRanges, professionalId]
+  );
 
   const [bookedRanges, setBookedRanges] = useState<BookedRange[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,8 +32,8 @@ export function TimeSlotGrid({ date, durationMin, selectedTime, onSelect }: Time
     let active = true;
     setLoading(true);
     supabase
-      .rpc("get_booked_slots", { p_date: date })
-      .then(({ data, error }) => {
+      .rpc("get_booked_slots", { p_date: date, p_professional_id: professionalId })
+      .then(({ data, error }: { data: { start_time: string; end_time: string }[] | null; error: unknown }) => {
         if (!active) return;
         if (error) {
           setBookedRanges([]);
@@ -40,7 +50,7 @@ export function TimeSlotGrid({ date, durationMin, selectedTime, onSelect }: Time
     return () => {
       active = false;
     };
-  }, [date]);
+  }, [date, professionalId]);
 
   const slots = useMemo(() => {
     const now = new Date();

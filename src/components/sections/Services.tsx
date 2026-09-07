@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Clock, ArrowRight, RefreshCw } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
@@ -13,10 +14,20 @@ const categoryIcons = {
 };
 
 export function Services() {
+  const professionals = useAppStore((s) => s.professionals);
   const services = useAppStore((s) => s.services);
   const loadingData = useAppStore((s) => s.loading);
   const loadError = useAppStore((s) => s.loadError);
   const reloadData = useAppStore((s) => s.reloadData);
+
+  const activeProfessionals = useMemo(() => professionals.filter((p) => p.active), [professionals]);
+  const [selectedProfessionalId, setSelectedProfessionalId] = useState<string | null>(null);
+  const currentProfessionalId = selectedProfessionalId ?? activeProfessionals[0]?.id ?? null;
+
+  const professionalServices = useMemo(
+    () => services.filter((s) => s.professionalId === currentProfessionalId),
+    [services, currentProfessionalId]
+  );
 
   return (
     <section id="servicos" className="relative py-20 md:py-28 bg-blush-50">
@@ -50,9 +61,27 @@ export function Services() {
           </div>
         )}
 
+        {activeProfessionals.length > 1 && (
+          <div className="mt-10 flex items-center justify-center gap-3">
+            {activeProfessionals.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => setSelectedProfessionalId(p.id)}
+                className={`rounded-full px-5 py-2 text-sm font-semibold transition-colors ${
+                  currentProfessionalId === p.id
+                    ? "bg-rose-600 text-white shadow-soft"
+                    : "bg-white text-rose-700 border border-blush-200 hover:border-rose-300"
+                }`}
+              >
+                {p.name}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="mt-14 space-y-14">
           {serviceCategories.map((cat) => {
-            const items = services.filter((s) => s.categoryId === cat.id && s.active);
+            const items = professionalServices.filter((s) => s.categoryId === cat.id && s.active);
             if (items.length === 0) return null;
             const Icon = categoryIcons[cat.icon];
             return (

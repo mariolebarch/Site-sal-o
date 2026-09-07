@@ -1,11 +1,15 @@
 import { MapPin, Phone, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
-import { business, weekdayNames, type Weekday } from "../data/business";
+import { business, weekdayNames, defaultBusinessHours, type Weekday } from "../data/business";
 import { useAppStore } from "../store/useAppStore";
 import { Monogram, IconInstagram } from "./decor/Icons";
 
+const DAYS: Weekday[] = [1, 2, 3, 4, 5, 6, 0];
+
 export function Footer() {
-  const businessHours = useAppStore((s) => s.businessHours);
+  const allProfessionals = useAppStore((s) => s.professionals);
+  const professionals = allProfessionals.filter((p) => p.active);
+  const businessHoursByProfessional = useAppStore((s) => s.businessHoursByProfessional);
 
   return (
     <footer className="bg-rose-900 text-blush-100">
@@ -46,14 +50,26 @@ export function Footer() {
           <h4 className="font-display text-base text-cream-50 mb-4 flex items-center gap-2">
             <Clock className="h-4 w-4 text-gold-300" /> Horário de funcionamento
           </h4>
-          <ul className="space-y-1.5 text-sm text-blush-200/85">
-            {([1, 2, 3, 4, 5, 6, 0] as Weekday[]).map((day) => (
-              <li key={day} className="flex justify-between gap-4">
-                <span>{weekdayNames[day]}</span>
-                <span>{businessHours[day].open ? `${businessHours[day].start} – ${businessHours[day].end}` : "Fechado"}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="space-y-4">
+            {professionals.map((p) => {
+              const hours = businessHoursByProfessional[p.id] ?? defaultBusinessHours;
+              return (
+                <div key={p.id}>
+                  {professionals.length > 1 && (
+                    <p className="text-xs font-semibold text-gold-300 mb-1.5">{p.name}</p>
+                  )}
+                  <ul className="space-y-1.5 text-sm text-blush-200/85">
+                    {DAYS.map((day) => (
+                      <li key={day} className="flex justify-between gap-4">
+                        <span>{weekdayNames[day]}</span>
+                        <span>{hours[day].open ? `${hours[day].start} – ${hours[day].end}` : "Fechado"}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
       <div className="border-t border-rose-800/60">
