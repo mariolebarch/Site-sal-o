@@ -186,6 +186,11 @@ where professional_id is null;
 
 alter table appointments alter column professional_id set not null;
 
+-- Reafirma a política que permite qualquer visitante criar um agendamento
+-- (garante que ela exista mesmo que tenha sido perdida em algum passo anterior).
+drop policy if exists "appointments_public_insert" on appointments;
+create policy "appointments_public_insert" on appointments for insert with check (true);
+
 drop policy if exists "appointments_admin_read" on appointments;
 drop policy if exists "appointments_read" on appointments;
 create policy "appointments_read" on appointments for select

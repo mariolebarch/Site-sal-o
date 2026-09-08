@@ -332,26 +332,32 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   addAppointment: async (a) => {
-    const { data, error } = await supabase
-      .from("appointments")
-      .insert({
-        professional_id: a.professionalId,
-        service_ids: a.serviceIds,
-        date: a.date,
-        start_time: a.startTime,
-        end_time: a.endTime,
-        client_name: a.clientName,
-        client_phone: a.clientPhone,
-        notes: a.notes ?? null,
-      })
-      .select()
-      .single();
-    if (error) return { ok: false, error: error.message };
-    const appointment = mapAppointmentRow(data);
+    const payload = {
+      professional_id: a.professionalId,
+      service_ids: a.serviceIds,
+      date: a.date,
+      start_time: a.startTime,
+      end_time: a.endTime,
+      client_name: a.clientName,
+      client_phone: a.clientPhone,
+      notes: a.notes ?? null,
+    };
+
+    // Uma cliente anônima agendando não tem permissão para reler o próprio
+    // agendamento (RLS só libera leitura para a profissional dona dele ou
+    // a administradora) — então só pede o registro de volta quando quem
+    // está criando já está autenticada (agendamento manual pelo admin).
     if (get().isAdminAuthenticated) {
+      const { data, error } = await supabase.from("appointments").insert(payload).select().single();
+      if (error) return { ok: false, error: error.message };
+      const appointment = mapAppointmentRow(data);
       set((s) => ({ appointments: [...s.appointments, appointment] }));
+      return { ok: true, appointment };
     }
-    return { ok: true, appointment };
+
+    const { error } = await supabase.from("appointments").insert(payload);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
   },
 
   cancelAppointment: async (id) => {
