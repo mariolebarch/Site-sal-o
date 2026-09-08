@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Playfair Display", "Georgia", serif;
+  --font-body: "Poppins", "Segoe UI", sans-serif;
+
+  --color-blush-50: #fdf6f5;
+  --color-blush-100: #f7e7e9;
+  --color-blush-200: #f0d2d8;
+  --color-blush-300: #e4b3c0;
+  --color-blush-400: #d189a0;
+  --color-rose-500: #b96684;
+  --color-rose-600: #a5486b;
+  --color-rose-700: #8a3a58;
+  --color-rose-800: #6f2e47;
+  --color-rose-900: #4a1f30;
+
+  --color-gold-300: #e9d38a;
+  --color-gold-400: #dcbb5c;
+  --color-gold-500: #d4af37;
+  --color-gold-600: #b3922a;
+
+  --color-ink-900: #2b2024;
+  --color-ink-700: #4a3b40;
+  --color-ink-500: #79666c;
+  --color-cream-50: #fffdfb;
+  --color-cream-100: #fbf6f2;
+
+  --shadow-soft: 0 10px 40px -12px rgba(74, 31, 48, 0.25);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--color-ink-900);
+  background-color: var(--color-cream-50);
+}
+
+h1, h2, h3, h4, .font-display {
+  font-family: var(--font-display);
+}
+
+::selection {
+  background: var(--color-rose-300, #e4b3c0);
+  color: var(--color-rose-900);
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-14px) rotate(3deg); }
+}
+.animate-float-slow {
+  animation: float-slow 7s ease-in-out infinite;
+}
+
+@keyframes float-slower {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(-4deg); }
+}
+.animate-float-slower {
+  animation: float-slower 9s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.animate-shimmer {
+  background-size: 200% auto;
+  animation: shimmer 3s linear infinite;
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+  animation: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: var(--color-blush-300);
+  border-radius: 999px;
+}
