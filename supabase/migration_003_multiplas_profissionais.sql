@@ -26,8 +26,22 @@ alter table professionals enable row level security;
 drop policy if exists "professionals_public_read" on professionals;
 create policy "professionals_public_read" on professionals for select using (true);
 
+-- Nunca usar "for all" aqui: incluiria SELECT, e essa política consulta a
+-- própria tabela professionals, causando recursão infinita em toda leitura.
 drop policy if exists "professionals_admin_write" on professionals;
-create policy "professionals_admin_write" on professionals for all
+drop policy if exists "professionals_admin_insert" on professionals;
+drop policy if exists "professionals_admin_update" on professionals;
+drop policy if exists "professionals_admin_delete" on professionals;
+
+create policy "professionals_admin_insert" on professionals for insert
+  with check (
+    exists (
+      select 1 from professionals p
+      where lower(p.email) = lower(auth.jwt() ->> 'email') and p.role = 'admin'
+    )
+  );
+
+create policy "professionals_admin_update" on professionals for update
   using (
     exists (
       select 1 from professionals p
@@ -35,6 +49,14 @@ create policy "professionals_admin_write" on professionals for all
     )
   )
   with check (
+    exists (
+      select 1 from professionals p
+      where lower(p.email) = lower(auth.jwt() ->> 'email') and p.role = 'admin'
+    )
+  );
+
+create policy "professionals_admin_delete" on professionals for delete
+  using (
     exists (
       select 1 from professionals p
       where lower(p.email) = lower(auth.jwt() ->> 'email') and p.role = 'admin'

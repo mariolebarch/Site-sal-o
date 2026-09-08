@@ -97,9 +97,15 @@ create policy "blocked_dates_public_read" on blocked_dates for select using (tru
 create policy "blocked_ranges_public_read" on blocked_ranges for select using (true);
 
 -- Escrita: administradora mexe em tudo; cada profissional só mexe no que é dela
-create policy "professionals_admin_write" on professionals for all
+-- Nunca usar "for all" aqui: incluiria SELECT, e essa política consulta a
+-- própria tabela professionals, causando recursão infinita em toda leitura.
+create policy "professionals_admin_insert" on professionals for insert
+  with check (exists (select 1 from professionals p where lower(p.email) = lower(auth.jwt() ->> 'email') and p.role = 'admin'));
+create policy "professionals_admin_update" on professionals for update
   using (exists (select 1 from professionals p where lower(p.email) = lower(auth.jwt() ->> 'email') and p.role = 'admin'))
   with check (exists (select 1 from professionals p where lower(p.email) = lower(auth.jwt() ->> 'email') and p.role = 'admin'));
+create policy "professionals_admin_delete" on professionals for delete
+  using (exists (select 1 from professionals p where lower(p.email) = lower(auth.jwt() ->> 'email') and p.role = 'admin'));
 
 create policy "services_admin_write" on services for all
   using (
